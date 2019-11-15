@@ -11,8 +11,10 @@ import { isUndefined } from "util";
 
 import config from './config';
 import Varif from './helper/varify';
+import Helper from './helper/middle';
 
 const app = new Koa();
+const helper = new Helper();
 
 app.use(cors());
 app.use(bodyParser())
@@ -20,7 +22,7 @@ app.use(serve(path.resolve(config.fileDir)))
 app.use(serve(path.join(__dirname, '..', 'client/dist')));
 
 app.use((ctx, next) => {
-  if (ctx.request.path.indexOf('/api')!=0) {
+  if (ctx.request.path.indexOf('/api')!==0) {
     ctx.response.type = 'html';
     ctx.response.body = fs.readFileSync(path.join(__dirname, '..', 'client/dist/index.html'), 'utf8');
   } else {
@@ -40,6 +42,11 @@ let middleware = koajwt({ secret: config.secret, debug: true }).unless({
     /\/api\/app\/.+/
   ]
 })
+
+app.use(helper.skip(middleware).if((ctx: any) => {
+    let key = ctx.request.headers['apikey']
+    return !isUndefined(key)
+}))
 
 app.use(async (ctx, next) => {
 

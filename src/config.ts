@@ -1,6 +1,6 @@
 import path from "path";
 
-const boolConfig = (str) => {
+const boolConfig = (str: string) => {
   if (str == 'true') {
       return true
   } else {
