@@ -9,6 +9,9 @@ import path from "path";
 
 import { isUndefined } from "util";
 
+import { restify } from './helper/rest';
+import router from './controller';
+
 import config from './config';
 import Varif from './helper/varify';
 import Helper from './helper/middle';
@@ -66,7 +69,8 @@ app.use(async (ctx, next) => {
 
 })
 
-// app.use
+app.use(restify())
+app.use(router.routes())
 
 export default app.listen(config.port, () => {
   console.log(`App is listening on ${config.port}.`)
