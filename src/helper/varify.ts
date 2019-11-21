@@ -1,4 +1,4 @@
-import { User } from '../model/user';
+import User from '../model/user';
 
 export default class Varify {
   static async auth(key: string) {

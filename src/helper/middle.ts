@@ -1,3 +1,4 @@
+// @ts-nocheck
 import compose from 'koa-compose';
 
 export default class Middle {

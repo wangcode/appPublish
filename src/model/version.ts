@@ -1,7 +1,30 @@
-import mongoose from '../helper/db';
-const Schema = mongoose.Schema;
+import mongoose from '../helper/db'
+const Schema = mongoose.Schema
 
-const versionSchema = new Schema({
+interface IVersion extends mongoose.Document {
+    appId: string
+    bundleId: string
+    icon: string
+    versionStr: string
+    versionCode: string
+    uploadAt: Date
+    uploader: string
+    uploaderId: string
+    size: number
+    active: boolean
+    downloadUrl: string
+    downloadCount: number
+    fileDownloadUrl: string
+    installUrl: string
+    showOnDownloadPage: boolean
+    appLevel: string
+    changelog: string
+    hidden: boolean
+    updateMode: 'silent'|'normal'|'force'
+}
+
+
+const versionSchema ={
     appId: String, //该版本的应用的id
     bundleId: {
         type: String,
@@ -27,6 +50,6 @@ const versionSchema = new Schema({
     changelog: String,
     hidden: { type: Boolean, default: false },
     updateMode: { type: String, default: 'normal', enum: ['silent', 'normal', 'force'] }
-});
+}
 
-export default mongoose.model('Version', versionSchema);
+export default mongoose.model<IVersion>('Version', new Schema(versionSchema))

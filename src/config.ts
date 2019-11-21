@@ -32,6 +32,8 @@ const common = {
     ldapUserDn: process.env.FABU_LDAP_USERDN || "", //ldap管理员dn 也就是管理员用户名
     ldapBindCredentials: process.env.FABU_LDAP_CREDENTIALS || "", //ldap管理员密码
     ldapBase: process.env.FABU_LDAP_BASE || "", //ldap base
+
+    hashLevel: 10 // 10是 hash加密的级别, 默认是10，数字越大加密级别越高
 };
 
 export default common;

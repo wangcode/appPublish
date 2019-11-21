@@ -1,10 +1,21 @@
 import mongoose from '../helper/db'
 
-const Schema = mongoose.Schema
-// @ts-ignore
-const ObjectId = Schema.ObjectId
+const Schema = mongoose.Schema, ObjectId = Schema.Types.ObjectId
 
-const teamSchema = new Schema({
+export interface ITeam extends mongoose.Document {
+    name: string
+    icon: string
+    creatorId: string
+    createAt: Date
+    members:{
+        _id: string,
+        username: String,
+        email: String,
+        role: "owner"|"manager"|"guest"
+    }[]
+}
+
+const teamSchema ={
   name: {
     type: String,
     required: true,
@@ -29,6 +40,6 @@ const teamSchema = new Schema({
       }
     }
   ]
-})
+}
 
-export default mongoose.model('Team', teamSchema);
+export default mongoose.model<ITeam>('Team', new Schema(teamSchema));
