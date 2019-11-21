@@ -1,13 +1,14 @@
-// @ts-nocheck
+import mongoose from 'mongoose'
+// @ts-ignore
+import Fawn from 'fawn'
 
-import mongoose from 'mongoose';
-import Fawn from 'fawn';
+import config from '../config'
 
-import config from '../config';
+// const dbUrl = config.dbUser ?
+//   `mongodb://${config.dbHost}:${config.dbPort}/${config.dbName}`:
+//   `mongodb://${config.dbUser}:${config.dbPass}@${config.dbHost}:${config.dbPort}/${config.dbName}`;
 
-const dbUrl = config.dbUser ?
-  `mongodb://${config.dbHost}:${config.dbPort}/${config.dbName}`:
-  `mongodb://${config.dbUser}:${config.dbPass}@${config.dbHost}:${config.dbPort}/${config.dbName}`;
+const dbUrl = `mongodb+srv://fabu:${encodeURIComponent('fabu')}@cluster0-4xjeo.azure.mongodb.net/test?retryWrites=true&w=majority`
 
 mongoose.connect(dbUrl, err => {
   if (err) {
@@ -23,6 +24,6 @@ mongoose
     console.log('Mongoose connection disconnected')
   })
 
-Fawn.init(mongoose);
+Fawn.init(mongoose)
 
 export default mongoose

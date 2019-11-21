@@ -8,7 +8,6 @@ import fs from 'fs'
 import _ from 'lodash'
 import fpath from 'path'
 import mustache from 'mustache';
-// import { multer } from '@koa/multer'
 import { getIp, responseWrapper } from "../helper/util"
 
 import config from '../config'
@@ -490,42 +489,6 @@ router.get('/api/app/:appShortUrl', async (ctx, next) => {
 
 })
 
-// 取消发布版本
-router.post('/:appId/:versionId', async (ctx, next) => {
-
-    let { appId, versionId } = ctx.params
-
-    let app = await App.findOne({ _id: appId })
-
-    let version = await Version.findOne({ _id: versionId })
-
-    if (!app) {
-        throw new Error("应用不存在")
-    }
-
-    if (!version) {
-        throw new Error("版本不存在")
-    }
-
-    if (versionId == app.releaseVersionId) {
-
-        await App.updateOne({ _id: appId }, { releaseVersionId: null })
-
-    }
-
-    if (versionId == app.grayReleaseVersionId) {
-
-        await App.updateOne({ _id: appId }, {
-            grayReleaseVersionId: null,
-            grayStrategy: null
-        })
-
-    }
-
-    ctx.body = responseWrapper('取消版本的发布成功')
-
-})
-
 // 获取应用的plist文件
 router.get('/plist/:appid/:versionId', async (ctx, next) => {
 
@@ -632,6 +595,8 @@ router.post('/:teamId/upload', upload.single('file'), async (ctx) => {
     // @ts-ignore
     let file = ctx.req.file
 
+    console.log(ctx.req)
+
     const { teamId } = ctx.params
 
     let team = await Team.findById(teamId)
@@ -658,6 +623,42 @@ router.post('/:teamId/upload', upload.single('file'), async (ctx) => {
     console.log(result.version.released)
 
     ctx.body = responseWrapper(result);
+
+})
+
+// 取消发布版本
+router.post('/:appId/:versionId', async (ctx, next) => {
+
+    let { appId, versionId } = ctx.params
+
+    let app = await App.findOne({ _id: appId })
+
+    let version = await Version.findOne({ _id: versionId })
+
+    if (!app) {
+        throw new Error("应用不存在")
+    }
+
+    if (!version) {
+        throw new Error("版本不存在")
+    }
+
+    if (versionId == app.releaseVersionId) {
+
+        await App.updateOne({ _id: appId }, { releaseVersionId: null })
+
+    }
+
+    if (versionId == app.grayReleaseVersionId) {
+
+        await App.updateOne({ _id: appId }, {
+            grayReleaseVersionId: null,
+            grayStrategy: null
+        })
+
+    }
+
+    ctx.body = responseWrapper('取消版本的发布成功')
 
 })
 

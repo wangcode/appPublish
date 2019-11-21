@@ -1,7 +1,8 @@
 import mongoose from '../helper/db';
 
 let Schema = mongoose.Schema
-let ObjectId = Schema.Types.ObjectId
+// @ts-ignore
+let ObjectId = Schema.ObjectId
 
 // https://github.com/Automattic/mongoose/issues/5046#issuecomment-412114160
 interface IUser extends mongoose.Document {

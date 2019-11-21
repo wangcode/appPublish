@@ -6,9 +6,12 @@ import Mail from '../helper/mail'
 
 import config from '../config'
 
-import bcrypt from "bcrypt"
+import bcrypt from "bcryptjs"
 import crypto from 'crypto'
 import { responseWrapper } from "../helper/util"
+
+// @ts-ignore
+import Fawn from 'fawn'
 
 import jwt from 'jsonwebtoken'
 
@@ -80,6 +83,7 @@ router.post('/register', async (ctx, next) => {
     }
 
     let { body } = ctx.request
+
 
     body.password = await bcrypt.hash(body.password, config.hashLevel)
 

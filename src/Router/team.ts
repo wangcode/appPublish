@@ -8,6 +8,9 @@ import Message from '../model/message'
 import Mail from '../helper/mail'
 import config from '../config'
 
+// @ts-ignore
+import Fawn from 'fawn'
+
 import { responseWrapper } from "../helper/util"
 import { userInTeamIsManager, userInTeam } from "../helper/validator"
 

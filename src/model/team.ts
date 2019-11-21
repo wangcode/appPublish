@@ -1,6 +1,8 @@
 import mongoose from '../helper/db'
 
-const Schema = mongoose.Schema, ObjectId = Schema.Types.ObjectId
+let Schema = mongoose.Schema
+// @ts-ignore
+let ObjectId = Schema.ObjectId
 
 export interface ITeam extends mongoose.Document {
     name: string

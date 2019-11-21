@@ -332,10 +332,8 @@ const extractApkIcon = (filepath: string, guid: string, team: ITeam): Promise<{s
             // @ts-ignore
             iconPath = iconPath.replace(/'/g, '')
             // @ts-ignore
-            let dir = path.join(uploadDir, team.id, "icon")
-            // @ts-ignore
             let realPath = path.join(team.id, "icon", '/{0}_a.png'.format(guid))
-            createFolderIfNeeded(dir)
+            createFolderIfNeeded(path.join(uploadDir, team.id, "icon"))
             let tempOut = path.join(uploadDir, realPath)
             // @ts-ignore
             let { ext, dir } = path.parse(iconPath)
