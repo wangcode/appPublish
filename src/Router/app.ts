@@ -1,3 +1,4 @@
+// @ts-nocheck
 import Router from 'koa-router'
 
 import App from '../model/app_model'
@@ -594,8 +595,6 @@ router.post('/:teamId/upload', upload.single('file'), async (ctx) => {
 
     // @ts-ignore
     let file = ctx.req.file
-
-    console.log(ctx.req)
 
     const { teamId } = ctx.params
 

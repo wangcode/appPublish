@@ -22,7 +22,7 @@ const helper = new Helper()
 
 app.use(cors())
 
-// app.use(bodyParser())
+app.use(bodyParser())
 
 app.use(serve(path.resolve(config.fileDir)))
 
@@ -42,8 +42,6 @@ let middleware = koajwt({ secret: config.secret, debug: true }).unless({
         /\/api\/user\/register/,
         /\/api\/user\/login/,
         /\/api\/user\/resetPassword/,
-        /\/api\/swagger/,
-        /\/api\/swagger.json/,
         /\/api\/plist\/.+/,
         /\/api\/count\/.+/,
         /\/api\/app\/.+/

@@ -1,28 +1,16 @@
 import fs from 'fs'
-import os from 'os'
 import path from 'path'
-import mime from 'mime'
 import mkdirp from 'mkdirp'
-import unzip from 'unzipper'
-// import multer from '@koa/multer'
 import multer from 'koa-multer'
-import apkParser3 from '../library/apkparser/apkparser'
 
 // @ts-ignore
-import AppInfoParser from 'app-info-parser'
-// import PkgReader from 'reiko-parser'
-
-// @ts-ignore
-import etl from 'etl'
-import { compose, maxBy, filter, get } from 'lodash/fp'
+import PkgReader from 'reiko-parser'
 
 import config from '../config'
 
 import Team, { ITeam } from '../model/team'
 import App from '../model/app_model'
 import Version from '../model/version'
-
-import { responseWrapper, exec } from '../helper/util'
 
 const uploadDir = path.join(config.fileDir, 'upload')
 
@@ -53,32 +41,23 @@ interface IAppInfo extends IParseIpaInfo {
 const parseAppAndInsertToDB = async (file: any, user: any, team: ITeam) => {
 
     let filePath = file.path
-    let parser, extractor
+    let parser
 
     if (path.extname(filePath) === ".ipa") {
-
         parser = parseIpa
-        extractor = extractIpaIcon
-
     } else if (path.extname(filePath) === ".apk") {
-
         parser = parseApk
-        extractor = extractApkIcon
-
     } else {
         throw (new Error("文件类型有误,仅支持IPA或者APK文件的上传."))
     }
 
-    //解析ipa和apk文件
-    let info: IAppInfo = await parser(filePath)
 
-    let fileName = info.bundleId + "_" + info.versionStr + "_" + info.versionCode
+    let AppInfo: IAppInfo = await parser(filePath)
 
-    //解析icon图标
-    let icon = await extractor(filePath, fileName, team)
+    let fileName = AppInfo.bundleId + "_" + AppInfo.versionStr + "_" + AppInfo.versionCode
 
     //移动文件到对应目录
-    let fileRelatePath = path.join(team.id, info.platform)
+    let fileRelatePath = path.join(team.id, AppInfo.platform)
 
     createFolderIfNeeded(path.join(uploadDir, fileRelatePath))
 
@@ -86,46 +65,36 @@ const parseAppAndInsertToDB = async (file: any, user: any, team: ITeam) => {
 
     await fs.renameSync(filePath, fileRealPath)
 
-    info.downloadUrl = path.join(uploadPrefix, fileRelatePath, fileName + path.extname(filePath))
+    AppInfo.downloadUrl = path.join(uploadPrefix, fileRelatePath, fileName + path.extname(filePath))
 
-    let app = await App.findOne({ 'platform': info.platform, 'bundleId': info.bundleId, 'ownerId': team._id })
+    let app = await App.findOne({ 'platform': AppInfo.platform, 'bundleId': AppInfo.bundleId, 'ownerId': team._id })
 
     if (!app) {
 
-        info.creator = user.username
+        AppInfo.creator = user.username
+        AppInfo.creatorId = user._id
+        // AppInfo.icon = path.join(uploadPrefix, icon.fileName)
+        // 想到的是直接存储 base64
+        // Todo
+        // 取到的是base64 想想怎么办
+        AppInfo.shortUrl = Math.random().toString(36).substring(2, 5) + Math.random().toString(36).substring(2, 5)
 
-        info.creatorId = user._id
-
-        info.icon = path.join(uploadPrefix, icon.fileName)
-
-        info.shortUrl = Math.random().toString(36).substring(2, 5) + Math.random().toString(36).substring(2, 5)
-
-        app = new App(info)
-
+        app = new App(AppInfo)
         app.ownerId = team._id
-
-        app.currentVersion = info.versionCode
-
+        app.currentVersion = AppInfo.versionCode
         await app.save()
 
-        info.uploader = user.username
+        AppInfo.uploader = user.username
+        AppInfo.uploaderId = user._id
+        AppInfo.size = fs.statSync(fileRealPath).size
 
-        info.uploaderId = user._id
-
-        info.size = fs.statSync(fileRealPath).size
-
-        let version = new Version(info)
-
+        let version = new Version(AppInfo)
         version.appId = app._id
 
         if (app.platform == 'ios') {
-
             version.installUrl = mapInstallUrl(app.id, version.id)
-
         } else {
-
-            version.installUrl = info.downloadUrl
-
+            version.installUrl = AppInfo.downloadUrl
         }
 
         await version.save()
@@ -134,29 +103,21 @@ const parseAppAndInsertToDB = async (file: any, user: any, team: ITeam) => {
 
     }
 
-
-    let version = await Version.findOne({ appId: app.id, versionCode: info.versionCode })
+    let version = await Version.findOne({ appId: app.id, versionCode: AppInfo.versionCode })
 
     if (!version) {
 
-        info.uploader = user.username
+        AppInfo.uploader = user.username
+        AppInfo.uploaderId = user._id
+        AppInfo.size = fs.statSync(fileRealPath).size
 
-        info.uploaderId = user._id
-
-        info.size = fs.statSync(fileRealPath).size
-
-        let version = new Version(info)
-
+        let version = new Version(AppInfo)
         version.appId = app._id
 
         if (app.platform == 'ios') {
-
             version.installUrl = mapInstallUrl(app.id, version.id)
-
         } else {
-
-            version.installUrl = `${config.baseUrl}/${info.downloadUrl}`
-
+            version.installUrl = `${config.baseUrl}/${AppInfo.downloadUrl}`
         }
 
         await version.save()
@@ -166,14 +127,15 @@ const parseAppAndInsertToDB = async (file: any, user: any, team: ITeam) => {
     } else {
 
         let err: NodeJS.ErrnoException = Error()
-
         err.code = '408'
-
         err.message = '当前版本已存在'
 
         throw err
 
     }
+
+
+
 }
 
 
@@ -185,220 +147,93 @@ interface IParseIpaInfo {
     versionStr?: string
     versionCode?: number
     iconName?: string
-    appLevel?: 'appstore'|'enterprise'|'develop'
+    iconBase64?: string
+    appLevel?: 'appstore' | 'enterprise' | 'develop'
 }
 
-// 解析 IPA
-const parseIpa = async (filename: string): Promise<IParseIpaInfo> => {
+const parseIpa = async (filePath: string): Promise<IParseIpaInfo> => {
 
-    const parser = new AppInfoParser(filename)
+    const parser = new PkgReader(filePath, 'ipa', { withIcon: true });
 
-    return new Promise((resolve, reject) => parser.parse().then( (result: any) => {
-        console.log('app info ----> ', result)
-        console.log('icon base64 ----> ', result.icon)
+    return new Promise((resolve, reject) => parser.parse((err: any, info: any) => {
 
-        let info: IParseIpaInfo = {
+        if (err) { reject(err) }
+
+        let AppInfo: IParseIpaInfo = {
             platform: 'ios',
-            bundleId: result.CFBundleIdentifier,
-            bundleName: result.CFBundleName,
-            appName: result.CFBundleDisplayName,
-            versionStr: result.CFBundleShortVersionString,
-            versionCode: result.CFBundleVersion,
-            iconName: result.CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconName,
+            bundleId: info.CFBundleIdentifier,
+            bundleName: info.CFBundleName,
+            appName: info.CFBundleDisplayName,
+            versionStr: info.CFBundleShortVersionString,
+            versionCode: info.CFBundleVersion,
+            iconName: info.CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconName,
+            iconBase64: info.icon,
             appLevel: 'enterprise'
         }
+
         try {
-            const environment = result.mobileProvision.Entitlements['aps-environment']
-            const active = result.mobileProvision.Entitlements['beta-reports-active']
+
+            let environment = info.mobileProvision.Entitlements['aps-environment']
+
+            let active = info.mobileProvision.Entitlements['beta-reports-active']
+
             if (environment == 'production') {
-                info.appLevel = active ? 'appstore' : 'enterprise'
+
+                AppInfo.appLevel = active ? 'appstore' : 'enterprise'
+
             } else {
-                info.appLevel = 'develop'
+
+                AppInfo.appLevel = 'develop'
+
             }
+
         } catch (err) {
-            info.appLevel = 'develop'
+
+            AppInfo.appLevel = 'develop'
+
             // reject("应用未签名,暂不支持")
         }
-        resolve(info)
+
+        resolve(AppInfo)
+
     }))
-}
-
-// 解析Apk
-const parseApk = (filename: string): Promise<IParseIpaInfo> => {
-
-    const parser = new AppInfoParser(filename)
-
-    return new Promise((resolve, reject) => {
-        parser.parse().then((result: any) => {
-            // console.log('app info ----> ', result)
-            // console.log('icon base64 ----> ', result.icon)
-            // console.log('====================================', JSON.stringify(result))
-            let label = undefined
-
-            if (result.application && result.application.label && result.application.label.length > 0) {
-                label = result.application.label[0]
-            }
-
-            if (label) {
-                label = label.replace(/'/g, '')
-            }
-            let appName = (result['application-label'] || result['application-label-zh-CN'] || result['application-label-es-US'] ||
-                result['application-label-zh_CN'] || result['application-label-es_US'] || label || 'unknown')
-
-            let info: IParseIpaInfo = {
-                appName: appName.replace(/'/g, ''),
-                versionCode: Number(result.versionCode),
-                bundleId: result.package,
-                versionStr: result.versionName,
-                platform: 'android'
-            }
-
-            resolve(info)
-
-        }).catch((err: any) => {
-            console.log('err ----> ', err)
-        })
-
-    })
-}
-
-const extractIpaIcon = async (filename: string, guid: string, team: ITeam): Promise<{success: boolean, fileName: string}> => {
-    let ipaInfo = await parseIpa(filename)
-    // @ts-ignore
-    let iconName = ipaInfo.iconName || 'AppIcon'
-    // @ts-ignore
-    let tmpOut = `${tempDir}/${guid}.png`
-    let found = false
-    let buffer = fs.readFileSync(filename)
-    let data = await unzip.Open.buffer(buffer)
-    await new Promise((resolve, reject) => {
-        data.files.forEach((file: any) => {
-            if (file.path.indexOf(iconName + '60x60@2x.png') != -1) {
-                found = true
-                file.stream()
-                    .pipe(fs.createWriteStream(tmpOut))
-                    .on('error', reject)
-                    .on('finish', resolve)
-            }
-        })
-    }).catch(err => { })
-
-    if (!found) {
-        throw (new Error('can not find icon'))
-    }
-
-    let pnfdefryDir = path.join(__dirname, '..', 'library/pngdefry')
-    //写入成功判断icon是否是被苹果破坏过的图片
-    let exeName = ''
-    if (os.type() === 'Darwin') {
-        exeName = 'pngfy-osx'
-    } else if (os.type() === 'Linux') {
-        exeName = 'pngfy-linux'
-    } else {
-        throw new Error(`不支持得操作系统: ${os.type()}`)
-    }
-
-    // @ts-ignore
-    let { stderr, stdout } = await exec(path.join(pnfdefryDir, exeName + ' -s _tmp ', tmpOut))
-    if (stderr) {
-        throw stderr
-    }
-    //执行pngdefry -s xxxx.png 如果结果显示"not an -iphone crushed PNG file"表示改png不需要修复
-    let iconRelatePath = path.join(team.id, "/icon")
-    let iconSuffix = "/" + guid + "_i.png"
-    createFolderIfNeeded(path.join(uploadDir, iconRelatePath))
-    if (stdout.indexOf('not an -iphone crushed PNG file') != -1) {
-        await fs.renameSync(tmpOut, path.join(uploadDir, iconRelatePath, iconSuffix))
-        return { 'success': true, 'fileName': iconRelatePath + iconSuffix }
-    }
-    await fs.unlinkSync(tmpOut)
-    // @ts-ignore
-    fs.renameSync(tempDir + `/${guid}_tmp.png`, path.join(uploadDir, iconRelatePath, iconSuffix))
-    return { 'success': true, 'fileName': iconRelatePath + iconSuffix }
 
 }
 
-const extractApkIcon = (filepath: string, guid: string, team: ITeam): Promise<{success: boolean, fileName: string}> => {
-    return new Promise((resolve, reject) => {
-        // @ts-ignore
-        apkParser3(filepath, (err, data) => {
 
-            let iconPath = ''
+const parseApk = (filePath: string): Promise<IParseIpaInfo> => {
 
-            let iconSize = [640, 320, 240, 160]
+    const parser = new PkgReader(filePath, 'apk', { withIcon: true });
 
-            for (let i in iconSize) {
-                if (typeof data['application-icon-' + iconSize[i]] !== 'undefined') {
-                    iconPath = data['application-icon-' + iconSize[i]]
-                    break
-                }
-            }
+    return new Promise((resolve, reject) => parser.parse((err: any, info: any) => {
 
-            if (iconPath==='') {
-                throw ('can not find app icon')
-            }
+        if (err) { reject(err) }
 
-            iconPath = iconPath.replace(/'/g, '')
+        let label = ''
 
-            let realPath = path.join(team.id, "icon", `/${guid}_a.png`)
+        if (info.application && info.application.label && info.application.label.length > 0) {
+            label = info.application.label[0]
+        }
 
-            createFolderIfNeeded(path.join(uploadDir, team.id, "icon"))
+        if (label !== '') { label = label.replace(/'/g, '') }
 
-            let tempOut = path.join(uploadDir, realPath)
+        let appName = (info['application-label'] || info['application-label-zh-CN'] || info['application-label-es-US'] ||
+            info['application-label-zh_CN'] || info['application-label-es_US'] || label || 'unknown')
 
-            let { ext, dir } = path.parse(iconPath)
+        let AppInfo: IParseIpaInfo = {
+            appName: appName.replace(/'/g, ''),
+            versionCode: Number(info.versionCode),
+            bundleId: info.package,
+            versionStr: info.versionName,
+            platform: 'android',
+            iconBase64: info.icon
+        }
 
-            // 获取到最大的png的路径
-            let maxSizePath: string
-            // if (ext === '.xml') {
+        resolve(AppInfo)
 
-            // } else {
-            //     fs.createReadStream(filepath)
-            //         .pipe(unzip.Parse())
-            //         .pipe(etl.map(entry => {
-            //             // 适配iconPath为ic_launcher.xml的情况
-            //             const entryPath = entry.path
-            //             // const isXml = entryPath.indexOf('.xml') >= 0
-            //             // if ( (!isXml && entryPath.indexOf(iconPath) != -1) || (isXml && entry.path.indexOf(maxSizePath) != -1)) {
-            //             //     console.log(entry.path)
-            //             entry.pipe(etl.toFile(tempOut))
-            //             resolve({ 'success': true, fileName: realPath })
-            //             // } else {
-            //             //     entry.autodrain()
-            //             // }
-            //         }))
-            // }
+    }))
 
-            const initialPromise = ext === '.xml' ?
-                unzip.Open.file(filepath).then((directory: any) => {
-                    const getMaxSizeImagePath = compose(get('path'), maxBy('compressedSize'),
-                        // @ts-ignore
-                        filter(entry => entry.path.indexOf(dir) >= 0 && entry.path.indexOf('.png') >= 0), get('files'))
-                    maxSizePath = getMaxSizeImagePath(directory)
-                }) : new Promise((resolve) => resolve())
-            initialPromise.then(() => {
-                fs.createReadStream(filepath)
-                    .pipe(unzip.Parse())
-                    // @ts-ignore
-                    .pipe(etl.map(entry => {
-                        // 适配iconPath为ic_launcher.xml的情况
-                        const entryPath = entry.path
-                        const isXml = entryPath.indexOf('.xml') >= 0
-                        // @ts-ignore
-                        if ((!isXml && entryPath.indexOf(iconPath) != -1) || (isXml && entry.path.indexOf(maxSizePath) != -1)) {
-                            console.log(entry.path)
-                            entry.pipe(etl.toFile(tempOut))
-                            resolve({ 'success': true, fileName: realPath })
-                        } else {
-                            resolve({ 'success': true, fileName: realPath })
-                            entry.autodrain()
-                        }
-                    }))
-            })
-        })
-    })
 }
-
 
 const createFolderIfNeeded = (path: string) => {
     if (!fs.existsSync(path)) {
