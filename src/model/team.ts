@@ -1,8 +1,7 @@
 import mongoose from '../helper/db'
 
 let Schema = mongoose.Schema
-// @ts-ignore
-let ObjectId = Schema.ObjectId
+let ObjectId = Schema.Types.ObjectId
 
 export interface ITeam extends mongoose.Document {
     name: string

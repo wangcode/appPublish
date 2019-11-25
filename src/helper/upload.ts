@@ -4,7 +4,9 @@ import path from 'path'
 import mime from 'mime'
 import mkdirp from 'mkdirp'
 import unzip from 'unzipper'
-import multer from '@koa/multer'
+// import multer from '@koa/multer'
+import multer from 'koa-multer'
+import apkParser3 from '../library/apkparser/apkparser'
 
 // @ts-ignore
 import AppInfoParser from 'app-info-parser'
@@ -22,11 +24,11 @@ import Version from '../model/version'
 
 import { responseWrapper, exec } from '../helper/util'
 
-const tempDir = path.join(config.fileDir, 'temp')
-
 const uploadDir = path.join(config.fileDir, 'upload')
 
 const uploadPrefix = "upload"
+
+const tempDir = path.join(config.fileDir, 'temp')
 
 const storage = multer.diskStorage({
     destination: tempDir,
@@ -195,14 +197,16 @@ const parseIpa = async (filename: string): Promise<IParseIpaInfo> => {
         console.log('app info ----> ', result)
         console.log('icon base64 ----> ', result.icon)
 
-        let info: IParseIpaInfo
-        info.platform = 'ios'
-        info.bundleId = result.CFBundleIdentifier
-        info.bundleName = result.CFBundleName
-        info.appName = result.CFBundleDisplayName
-        info.versionStr = result.CFBundleShortVersionString
-        info.versionCode = result.CFBundleVersion
-        info.iconName = result.CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconName
+        let info: IParseIpaInfo = {
+            platform: 'ios',
+            bundleId: result.CFBundleIdentifier,
+            bundleName: result.CFBundleName,
+            appName: result.CFBundleDisplayName,
+            versionStr: result.CFBundleShortVersionString,
+            versionCode: result.CFBundleVersion,
+            iconName: result.CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconName,
+            appLevel: 'enterprise'
+        }
         try {
             const environment = result.mobileProvision.Entitlements['aps-environment']
             const active = result.mobileProvision.Entitlements['beta-reports-active']
@@ -263,7 +267,7 @@ const extractIpaIcon = async (filename: string, guid: string, team: ITeam): Prom
     // @ts-ignore
     let iconName = ipaInfo.iconName || 'AppIcon'
     // @ts-ignore
-    let tmpOut = tempDir + '/{0}.png'.format(guid)
+    let tmpOut = `${tempDir}/${guid}.png`
     let found = false
     let buffer = fs.readFileSync(filename)
     let data = await unzip.Open.buffer(buffer)
@@ -291,7 +295,7 @@ const extractIpaIcon = async (filename: string, guid: string, team: ITeam): Prom
     } else if (os.type() === 'Linux') {
         exeName = 'pngfy-linux'
     } else {
-        throw new Error('Unknown OS!')
+        throw new Error(`不支持得操作系统: ${os.type()}`)
     }
 
     // @ts-ignore
@@ -309,7 +313,7 @@ const extractIpaIcon = async (filename: string, guid: string, team: ITeam): Prom
     }
     await fs.unlinkSync(tmpOut)
     // @ts-ignore
-    fs.renameSync(tempDir + '/{0}_tmp.png'.format(guid), path.join(uploadDir, iconRelatePath, iconSuffix))
+    fs.renameSync(tempDir + `/${guid}_tmp.png`, path.join(uploadDir, iconRelatePath, iconSuffix))
     return { 'success': true, 'fileName': iconRelatePath + iconSuffix }
 
 }
@@ -318,28 +322,34 @@ const extractApkIcon = (filepath: string, guid: string, team: ITeam): Promise<{s
     return new Promise((resolve, reject) => {
         // @ts-ignore
         apkParser3(filepath, (err, data) => {
-            let iconPath = false
+
+            let iconPath = ''
+
             let iconSize = [640, 320, 240, 160]
+
             for (let i in iconSize) {
                 if (typeof data['application-icon-' + iconSize[i]] !== 'undefined') {
                     iconPath = data['application-icon-' + iconSize[i]]
                     break
                 }
             }
-            if (!iconPath) {
+
+            if (iconPath==='') {
                 throw ('can not find app icon')
             }
-            // @ts-ignore
+
             iconPath = iconPath.replace(/'/g, '')
-            // @ts-ignore
-            let realPath = path.join(team.id, "icon", '/{0}_a.png'.format(guid))
+
+            let realPath = path.join(team.id, "icon", `/${guid}_a.png`)
+
             createFolderIfNeeded(path.join(uploadDir, team.id, "icon"))
+
             let tempOut = path.join(uploadDir, realPath)
-            // @ts-ignore
+
             let { ext, dir } = path.parse(iconPath)
+
             // 获取到最大的png的路径
-            // @ts-ignore
-            let maxSizePath
+            let maxSizePath: string
             // if (ext === '.xml') {
 
             // } else {
