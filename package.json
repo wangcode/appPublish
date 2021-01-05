@@ -13,7 +13,7 @@
     "@koa/multer": "^2.0.1",
     "@types/bcryptjs": "^2.4.2",
     "app-info-parser": "^0.3.5",
-    "axios": "^0.19.0",
+    "axios": "^0.21.1",
     "bcryptjs": "^2.4.3",
     "etl": "^0.6.10",
     "fawn": "^2.1.5",
